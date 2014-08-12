@@ -19,6 +19,7 @@ ALL = [RED1, YLW1, GRN1, RED2, YLW2, GRN2]
 
 lookup = {'RED1': RED1, 'YLW1': YLW1, 'GRN1': GRN1,
           'RED2': RED2, 'YLW2': YLW2, 'GRN2': GRN2}
+rev_lookup = {v: k for k, v in lookup.iteritems()}
 
 
 def setup():
