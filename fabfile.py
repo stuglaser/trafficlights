@@ -37,3 +37,6 @@ def deploy():
     run('hostname')
     put('traffic.py')
     put('lights.py')
+    put('init-%s' % env.host_string, '/etc/init.d/traffic', use_sudo=True)
+    sudo('chown root:root /etc/init.d/traffic')
+    sudo('chmod 755 /etc/init.d/traffic')
