@@ -35,11 +35,12 @@ def setup():
 
 def deploy():
     run('hostname')
+    sudo('/etc/init.d/traffic stop', pty=False)
     put('traffic.py')
     put('lights.py')
     put('run.sh')
     put('init-%s' % env.host_string, '/etc/init.d/traffic', use_sudo=True)
     sudo('chown root:root /etc/init.d/traffic')
+    sudo('update-rc.d traffic defaults')
     sudo('chmod 755 /etc/init.d/traffic')
-    sudo('/etc/init.d/traffic stop', pty=False)
     sudo('/etc/init.d/traffic start', pty=False)
