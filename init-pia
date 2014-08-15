@@ -10,7 +10,7 @@
 # Description:       Traffic lights
 ### END INIT INFO
 
-DAEMON="/usr/bin/python /home/pi/traffic.py"
+DAEMON="/bin/bash /home/pi/run.sh"
 PIDFILE="/var/run/traffic.pid"
 
 . /lib/lsb/init-functions

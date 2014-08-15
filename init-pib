@@ -11,7 +11,7 @@
 ### END INIT INFO
 
 ARGS="-m pia"
-DAEMON="/usr/bin/python /home/pi/traffic.py"
+DAEMON="/bin/bash /home/pi/run.sh"
 PIDFILE="/var/run/traffic.pid"
 
 . /lib/lsb/init-functions
