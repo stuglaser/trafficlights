@@ -30,21 +30,24 @@ class LightTimer(object):
         self._thread.start()
 
     def run(self):
-        t_green = self.period - self.yellow
-        states = [
-            (t_green, [lights.RED1, lights.GRN2]),
-            (self.yellow, [lights.RED1, lights.YLW2]),
-            (t_green, [lights.GRN1, lights.RED2]),
-            (self.yellow, [lights.YLW1, lights.RED2]),
+        STATES = [
+            [lights.RED1, lights.GRN2],
+            [lights.RED1, lights.YLW2],
+            [lights.GRN1, lights.RED2],
+            [lights.YLW1, lights.RED2],
         ]
-        state_i = len(states) - 1
+        state_i = len(STATES) - 1
         t_last = 0
         while not self._stop.is_set():
+            t_yellow = min(0.25 * self.period, DEFAULT_YELLOW)
+            t_green = self.period - t_yellow
+            dur = t_green if state_i % 2 == 0 else t_yellow
+
             now = time.time()
-            if now > t_last + states[state_i][0]:
+            if now > t_last + dur:
                 t_last = now
-                state_i = (state_i + 1) % len(states)
-                self.chan.put(states[state_i][1])
+                state_i = (state_i + 1) % len(STATES)
+                self.chan.put(STATES[state_i])
             time.sleep(0.1)
         self.chan.close()
 
@@ -76,6 +79,10 @@ class Server(object):
             st['loop'] = 'Error: Did not hear from main thread in time'
         return st
 
+    def set_period(self, period):
+        self.chan.put(('set_period', period), timeout=2.0)
+        return True
+
 
 def master_loop():
     sock_slave = Socket(PAIR)
@@ -93,6 +100,7 @@ def master_loop():
         #print 'AFTER chanselect', ch is timer.chan, time.time()
         if ch is timer.chan:
             lights.only(*value)
+            #print "LIGHTS", value
             try:
                 seq += 1
                 sock_slave.send('%i %s %s' % (
@@ -118,6 +126,10 @@ def master_loop():
                 except Exception as ex:
                     slave = repr(ex)
                 value[1].put({'loop': 'ok', 'slave': slave})
+            elif value[0] == 'set_period':
+                timer.period = value[1]
+            else:
+                print "UNKNOWN COMMAND:", value
     time.sleep(2)
 
 
