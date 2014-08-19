@@ -23,6 +23,7 @@ class LightTimer(object):
     def __init__(self, period=DEFAULT_PERIOD, yellow=DEFAULT_YELLOW):
         self.period = period
         self.yellow = yellow
+        self.trip = False
         self._stop = threading.Event()
         self.chan = Chan()
         self._thread = threading.Thread(name='LightTimer', target=self.run)
@@ -44,10 +45,11 @@ class LightTimer(object):
             dur = t_green if state_i % 2 == 0 else t_yellow
 
             now = time.time()
-            if now > t_last + dur:
+            if now > t_last + dur or self.trip:
                 t_last = now
                 state_i = (state_i + 1) % len(STATES)
                 self.chan.put(STATES[state_i])
+                self.trip = False
             time.sleep(0.1)
         self.chan.close()
 
@@ -81,6 +83,11 @@ class Server(object):
 
     def set_period(self, period):
         self.chan.put(('set_period', period), timeout=2.0)
+        return True
+
+
+    def trip(self):
+        self.chan.put(('trip',), timeout=2.0)
         return True
 
 
@@ -128,6 +135,8 @@ def master_loop():
                 value[1].put({'loop': 'ok', 'slave': slave})
             elif value[0] == 'set_period':
                 timer.period = value[1]
+            elif value[0] == 'trip':
+                timer.trip = True
             else:
                 print "UNKNOWN COMMAND:", value
     time.sleep(2)
