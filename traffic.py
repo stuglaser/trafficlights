@@ -21,7 +21,7 @@ CMD_LIGHTS = 'LIGHTS'
 
 
 class DiscoTimer(object):
-    def __init__(self, base=500, jitter=1000):
+    def __init__(self, base=1000, jitter=500):
         self.trip = False
         self._stop = threading.Event()
         self.chan = Chan()
@@ -40,7 +40,14 @@ class DiscoTimer(object):
                 if maybe == 1:
                     random_lights.append(l)
             self.chan.put(random_lights)
-            time.sleep((self.base + random.randint(0, self.jitter)) / 1000)
+            d = random.randint(0, 1)
+            ti = self.base
+            ji = random.randint(0, self.jitter)
+            if d == 0:
+                ti = ti + ji
+            else:
+                ti = ti - ji
+            time.sleep(ti / 1000)
 
     def stop(self):
         self._stop.set()
