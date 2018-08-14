@@ -165,9 +165,10 @@ def slave_loop(master):
 def main():
     parser = argparse.ArgumentParser(description='Traffic light control system')
     parser.add_argument('--master', '-m', help='Address of master')
+    parser.add_argument('--fake', '-f', help='Fake Mode', default=False, action='store_true')
     args = parser.parse_args()
 
-    with lights.setup_manager():
+    with lights.setup_manager(args.fake):
         if args.master is None:
             print 'I am the master'
             master_loop()
