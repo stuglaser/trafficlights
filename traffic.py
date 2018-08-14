@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import random
 from chan import Chan, chanselect, Timeout, ChanClosed
 from nanomsg import Socket, PAIR, PUB
 from SimpleXMLRPCServer import SimpleXMLRPCServer
@@ -19,6 +20,72 @@ CMD_PING = 'PING'
 CMD_LIGHTS = 'LIGHTS'
 
 
+class DiscoTimer(object):
+    def __init__(self, base=500, jitter=1000):
+        self.trip = False
+        self._stop = threading.Event()
+        self.chan = Chan()
+        self._thread = threading.Thread(name='LightTimer', target=self.run)
+        self._thread.daemon = True
+        self._thread.start()
+        self.base = base
+        self.jitter = jitter
+        random.seed()
+
+    def run(self):
+        while not self._stop.is_set():
+            random_lights = []
+            for l in lights.ALL:
+                maybe = random.randint(0, 1)
+                if maybe == 1:
+                    random_lights.append(l)
+            self.chan.put(random_lights)
+            time.sleep((self.base + random.randint(0, self.jitter)) / 1000)
+
+    def stop(self):
+        self._stop.set()
+        
+class SolidTimer(object):
+    def __init__(self, color, blink=False, period=0.5):
+        self.blink = blink
+        self.period = period
+        self.color = color.split('-')[0]
+        self.chan = Chan()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(name='LightTimer', target=self.run)
+        self._thread.daemon = True
+        self._thread.start()
+
+    def run(self):
+        STATE = []
+        if self.color == 'red':
+            STATE = [lights.RED1, lights.RED2]
+        elif self.color == 'yellow':
+            STATE = [lights.YLW1, lights.YLW2]
+        elif self.color == 'green':
+            STATE = [lights.GRN1, lights.GRN2]
+
+        on = True
+        while not self._stop.is_set():
+            if on:
+                if self.blink:
+                    self.chan.put([STATE[0]])
+                    on = False
+                    time.sleep(self.period)
+                else:
+                    self.chan.put(STATE)
+                    time.sleep(5)
+            else:
+                self.chan.put([STATE[1]])
+                on = True
+                time.sleep(self.period)
+
+
+        self.chan.close()
+
+    def stop(self):
+        self._stop.set()
+            
 class LightTimer(object):
     def __init__(self, period=DEFAULT_PERIOD, yellow=DEFAULT_YELLOW):
         self.period = period
@@ -91,7 +158,7 @@ class Server(object):
         return True
 
 
-def master_loop():
+def master_loop(mode):
     sock_slave = Socket(PAIR)
     sock_slave.bind('tcp://*:%s' % MASTER_PORT)
     sock_slave.recv_timeout = 250
@@ -99,7 +166,16 @@ def master_loop():
     sock_slave.send_timeout = 200
     seq = 0
 
-    timer = LightTimer()
+    timer = None
+    if mode == 'cycle':
+        timer = LightTimer()
+    elif mode == 'red' or mode == 'green' or mode == 'yellow':
+        timer = SolidTimer(mode)
+    elif mode == 'red-blink' or mode == 'green-blink' or mode == 'yellow-blink':
+        timer = SolidTimer(mode, True)
+    elif mode == 'disco':
+        timer = DiscoTimer()
+
     server = Server()
 
     while True:
@@ -166,12 +242,16 @@ def main():
     parser = argparse.ArgumentParser(description='Traffic light control system')
     parser.add_argument('--master', '-m', help='Address of master')
     parser.add_argument('--fake', '-f', help='Fake Mode', default=False, action='store_true')
+    parser.add_argument('--mode', help='Force a different mode', default='cycle')
     args = parser.parse_args()
+
+    if args.mode != 'cycle' and args.mode != 'red' and args.mode != 'yellow' and args.mode != 'green' and args.mode != 'disco' and args.mode != 'red-blink' and args.mode != 'yellow-blink' and args.mode != 'green-blink':
+        raise Exception('Bad mode')
 
     with lights.setup_manager(args.fake):
         if args.master is None:
             print 'I am the master'
-            master_loop()
+            master_loop(args.mode)
         else:
             print 'Obeying:', args.master
             slave_loop(args.master)

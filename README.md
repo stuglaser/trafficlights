@@ -18,3 +18,12 @@ These instructions should work on any recentish raspian
 2) Activate the virtualenv with `. devenv/bin/activate`
 3) Install deps with fabric with `fab -H 1.2.3.4 -u pi --initial-password-prompt setup` or some variant
 4) "Deploy" the traffic lights with `fab -H 1.2.3.4 -u pi --initial-password-prompt deploy` - note the initscript is disabled for now
+
+
+## Modes
+
+There are a bunch of different modes you can select between via the `--mode` command line option. The default remains the normal cycle.
+
+* solid colors - `red`, `yellow`, `green`
+* blinking colors - `red-blink`, `yellow-blink`, `green-blink`
+* disco mode yo - `disco`

@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-import time
 from termcolor import colored
 
 fh = open('/proc/cpuinfo', 'r')
