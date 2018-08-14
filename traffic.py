@@ -10,7 +10,7 @@ import threading
 import lights
 
 
-MASTER_PORT = 55755
+BRAIN_PORT = 55755
 SERVER_PORT = 8085
 
 DEFAULT_PERIOD = 12
@@ -158,12 +158,12 @@ class Server(object):
         return True
 
 
-def master_loop(mode):
-    sock_slave = Socket(PAIR)
-    sock_slave.bind('tcp://*:%s' % MASTER_PORT)
-    sock_slave.recv_timeout = 250
-    #sock_slave.send_buffer_size = 1000
-    sock_slave.send_timeout = 200
+def brain_loop(mode):
+    sock_node = Socket(PAIR)
+    sock_node.bind('tcp://*:%s' % BRAIN_PORT)
+    sock_node.recv_timeout = 250
+    #sock_node.send_buffer_size = 1000
+    sock_node.send_timeout = 200
     seq = 0
 
     timer = None
@@ -186,7 +186,7 @@ def master_loop(mode):
             #print "LIGHTS", value
             try:
                 seq += 1
-                sock_slave.send('%i %s %s' % (
+                sock_node.send('%i %s %s' % (
                     seq,
                     CMD_LIGHTS,
                     ' '.join(lights.rev_lookup[led_pin] for led_pin in value)))
@@ -195,20 +195,20 @@ def master_loop(mode):
                 pass
         elif ch is server.chan:
             if value[0] == 'status':
-                slave = None
+                node = None
                 try:
                     seq += 1
-                    sock_slave.send('%i PING' % seq)
+                    sock_node.send('%i PING' % seq)
                     while True:
-                        slave_msg = sock_slave.recv().split()
-                        if int(slave_msg[0]) == seq:
-                            slave = 'ok'
+                        node_msg = sock_node.recv().split()
+                        if int(node_msg[0]) == seq:
+                            node = 'ok'
                             break
-                        elif int(slave_msg[0]) > seq:
+                        elif int(node_msg[0]) > seq:
                             raise Exception('Skipped ping message')
                 except Exception as ex:
-                    slave = repr(ex)
-                value[1].put({'loop': 'ok', 'slave': slave})
+                    node = repr(ex)
+                value[1].put({'loop': 'ok', 'node': node})
             elif value[0] == 'set_period':
                 timer.period = value[1]
             elif value[0] == 'trip':
@@ -218,19 +218,19 @@ def master_loop(mode):
     time.sleep(2)
 
 
-def slave_loop(master):
-    sock_master = Socket(PAIR)
-    sock_master.connect('tcp://%s:%s' % (master, MASTER_PORT))
+def node_loop(brain):
+    sock_brain = Socket(PAIR)
+    sock_brain.connect('tcp://%s:%s' % (brain, BRAIN_PORT))
 
     while True:
-        msg = sock_master.recv()
+        msg = sock_brain.recv()
         #print 'HEARD', msg
         bits = msg.split()
         msgid = bits[0]
         cmd = bits[1]
 
         if cmd == CMD_PING:
-            sock_master.send('%s PONG' % msgid)
+            sock_brain.send('%s PONG' % msgid)
         elif cmd == CMD_LIGHTS:
             which_pins = [lights.lookup[lgt] for lgt in bits[2:]]
             lights.only(*which_pins)
@@ -240,21 +240,21 @@ def slave_loop(master):
 
 def main():
     parser = argparse.ArgumentParser(description='Traffic light control system')
-    parser.add_argument('--master', '-m', help='Address of master')
+    parser.add_argument('--brain', '-b', help='Address of brain')
     parser.add_argument('--fake', '-f', help='Fake Mode', default=False, action='store_true')
-    parser.add_argument('--mode', help='Force a different mode', default='cycle')
+    parser.add_argument('--mode', '-m', help='Force a different mode', default='cycle')
     args = parser.parse_args()
 
     if args.mode != 'cycle' and args.mode != 'red' and args.mode != 'yellow' and args.mode != 'green' and args.mode != 'disco' and args.mode != 'red-blink' and args.mode != 'yellow-blink' and args.mode != 'green-blink':
         raise Exception('Bad mode')
 
     with lights.setup_manager(args.fake):
-        if args.master is None:
-            print 'I am the master'
-            master_loop(args.mode)
+        if args.brain is None:
+            print 'I am the brain'
+            brain_loop(args.mode)
         else:
-            print 'Obeying:', args.master
-            slave_loop(args.master)
+            print 'Listening to:', args.brain
+            node_loop(args.brain)
 
 
 if __name__ == '__main__':
