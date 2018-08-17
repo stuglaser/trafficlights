@@ -2,7 +2,7 @@
 import argparse
 import random
 from chan import Chan, chanselect, Timeout, ChanClosed
-from nanomsg import Socket, PAIR, PUB
+from nanomsg import Socket, BUS
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 import time
 import threading
@@ -242,7 +242,7 @@ def read_mode(mode):
     return mode
 
 def brain_loop(args):
-    sock_node = Socket(PAIR)
+    sock_node = Socket(BUS)
     sock_node.bind('tcp://*:%s' % BRAIN_PORT)
     sock_node.recv_timeout = 250
     #sock_node.send_buffer_size = 1000
@@ -299,7 +299,7 @@ def brain_loop(args):
 
 
 def node_loop(brain):
-    sock_brain = Socket(PAIR)
+    sock_brain = Socket(BUS)
     sock_brain.connect('tcp://%s:%s' % (brain, BRAIN_PORT))
 
     while True:
