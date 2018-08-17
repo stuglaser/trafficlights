@@ -1,3 +1,4 @@
+import sys
 from contextlib import contextmanager
 from termcolor import colored
 
@@ -20,10 +21,28 @@ YLW2 = 13
 GRN2 = 15
 ALL = [RED1, YLW1, GRN1, RED2, YLW2, GRN2]
 IS_FAKE = False
+
+COLOR_BTN = 21
+SOLID_SWT = 7 # blink when nothing is set
+CYCLE_SWT = 22
+DISCO_SWT = 19
+
 lookup = {'RED1': RED1, 'YLW1': YLW1, 'GRN1': GRN1,
           'RED2': RED2, 'YLW2': YLW2, 'GRN2': GRN2}
 rev_lookup = {v: k for k, v in lookup.iteritems()}
 
+
+def setup_controls():
+    if 'RPi.GPIO' not in sys.modules:
+        raise Exception('Cannot use HW on non RPi')
+
+    if not GPIO.getmode():
+        GPIO.setmode(GPIO.BOARD)
+
+    GPIO.setup(COLOR_BTN, GPIO.IN)
+    GPIO.setup(DISCO_SWT, GPIO.IN)
+    GPIO.setup(CYCLE_SWT, GPIO.IN)
+    GPIO.setup(SOLID_SWT, GPIO.IN)
 
 def setup():
     if not IS_FAKE:
@@ -38,11 +57,17 @@ def cleanup():
         GPIO.cleanup()
 
 
+def input(button):
+    return GPIO.input(button)
+
 @contextmanager
-def setup_manager(fake=False):
+def setup_manager(args):
     global IS_FAKE
-    IS_FAKE=fake
+    IS_FAKE=args.fake
     setup()
+    if args.controls:
+        setup_controls()
+
     try:
         yield
     finally:

@@ -132,17 +132,38 @@ class LightTimer(object):
 
 
 class Server(object):
-    def __init__(self):
+    def __init__(self, args):
         self.chan = Chan()
         self._server = SimpleXMLRPCServer(
             ('0.0.0.0', SERVER_PORT),
             logRequests=False,
             allow_none=True)
+        self.mode = args.mode
         self._server.register_introspection_functions()
         self._server.register_instance(self)
-        self._thread = threading.Thread(name='Server', target=self._server.serve_forever)
+        self._stop = threading.Event()
+        self.changed = 0
+        if args.controls:
+            self._thread = threading.Thread(name='Server', target=self.run)
+        else:
+            self._thread = threading.Thread(name='Server', target=self._server.serve_forever)
         self._thread.daemon = True
         self._thread.start()
+
+
+    def run(self):
+        while not self._stop.is_set():
+            mode = read_mode(self.mode)
+            now = int(round(time.time() * 1000))
+            if mode != self.mode and (now - self.changed > 250):
+                self.mode = mode
+                self.chan.put(('mode', self.mode), timeout=2.0)
+                self.changed = now
+
+            time.sleep(0.1)
+
+    def stop(self):
+        self._stop.set()
 
     def status(self):
         st = {'server': 'ok'}
@@ -165,7 +186,62 @@ class Server(object):
         return True
 
 
-def brain_loop(mode):
+def set_mode(mode, existing=None):
+    if existing:
+        existing.stop()
+
+    if mode == 'cycle':
+        return LightTimer()
+    elif mode == 'red' or mode == 'green' or mode == 'yellow':
+        return SolidTimer(mode)
+    elif mode == 'red-blink' or mode == 'green-blink' or mode == 'yellow-blink':
+        return SolidTimer(mode, True)
+    elif mode == 'disco':
+        return DiscoTimer()
+
+def solid_color(mode, button):
+    if mode == 'disco' or mode == 'cycle' or mode == 'red-blink' or mode == 'yellow-blink' or mode == 'green-blink':
+        return 'red'
+    elif mode == 'red' and button:
+        return 'green'
+    elif mode == 'green' and button:
+        return 'yellow'
+    elif mode == 'yellow' and button:
+        return 'red'
+    else:
+        return mode
+
+def blink_color(mode, button):
+    if mode == 'disco' or mode == 'cycle' or mode == 'red' or mode == 'yellow' or mode == 'green':
+        return 'red-blink'
+    elif mode == 'red-blink' and button:
+        return 'green-blink'
+    elif mode == 'green-blink' and button:
+        return 'yellow-blink'
+    elif mode == 'yellow-blink' and button:
+        return 'red-blink'
+    else:
+        return mode
+
+def read_mode(mode):
+    disco_switch = lights.input(lights.DISCO_SWT)
+    solid_switch = lights.input(lights.SOLID_SWT)
+    cycle_switch = lights.input(lights.CYCLE_SWT)
+    color_button = lights.input(lights.COLOR_BTN)
+
+#    print("%d%d%d%d" % (disco_switch, solid_switch, cycle_switch, color_button))
+    if disco_switch and mode != 'disco':
+        return "disco"
+    elif solid_switch and not disco_switch:
+        return solid_color(mode, color_button)
+    elif (not solid_switch and not disco_switch and not cycle_switch):
+        return blink_color(mode, color_button)
+    elif cycle_switch and not disco_switch and mode != 'cycle':
+        return "cycle"
+
+    return mode
+
+def brain_loop(args):
     sock_node = Socket(PAIR)
     sock_node.bind('tcp://*:%s' % BRAIN_PORT)
     sock_node.recv_timeout = 250
@@ -173,20 +249,12 @@ def brain_loop(mode):
     sock_node.send_timeout = 200
     seq = 0
 
-    timer = None
-    if mode == 'cycle':
-        timer = LightTimer()
-    elif mode == 'red' or mode == 'green' or mode == 'yellow':
-        timer = SolidTimer(mode)
-    elif mode == 'red-blink' or mode == 'green-blink' or mode == 'yellow-blink':
-        timer = SolidTimer(mode, True)
-    elif mode == 'disco':
-        timer = DiscoTimer()
-
-    server = Server()
+    timer = set_mode(args.mode)
+    server = Server(args)
 
     while True:
         ch, value = chanselect([timer.chan, server.chan], [])
+
         #print 'AFTER chanselect', ch is timer.chan, time.time()
         if ch is timer.chan:
             lights.only(*value)
@@ -220,8 +288,13 @@ def brain_loop(mode):
                 timer.period = value[1]
             elif value[0] == 'trip':
                 timer.trip = True
+            elif value[0] == 'mode':
+                mode = value[1]
+                print("new mode tho %s" % mode)
+                timer = set_mode(mode)
             else:
                 print "UNKNOWN COMMAND:", value
+
     time.sleep(2)
 
 
@@ -250,15 +323,16 @@ def main():
     parser.add_argument('--brain', '-b', help='Address of brain')
     parser.add_argument('--fake', '-f', help='Fake Mode', default=False, action='store_true')
     parser.add_argument('--mode', '-m', help='Force a different mode', default='cycle')
+    parser.add_argument('--controls', '-c', help='Use hardware controls', default=False, action='store_true')
     args = parser.parse_args()
 
     if args.mode != 'cycle' and args.mode != 'red' and args.mode != 'yellow' and args.mode != 'green' and args.mode != 'disco' and args.mode != 'red-blink' and args.mode != 'yellow-blink' and args.mode != 'green-blink':
         raise Exception('Bad mode')
 
-    with lights.setup_manager(args.fake):
+    with lights.setup_manager(args):
         if args.brain is None:
             print 'I am the brain'
-            brain_loop(args.mode)
+            brain_loop(args)
         else:
             print 'Listening to:', args.brain
             node_loop(args.brain)
