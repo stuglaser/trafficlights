@@ -1,5 +1,7 @@
 #!/bin/sh
 
+#!/bin/sh
+
 ### BEGIN INIT INFO
 # Provides:          traffic
 # Required-Start:    $remote_fs $syslog
@@ -10,16 +12,35 @@
 # Description:       Traffic lights
 ### END INIT INFO
 
-ARGS="-m pia"
 DAEMON="/bin/bash /home/pi/run.sh"
 PIDFILE="/var/run/traffic.pid"
+ARGS=""
 
 . /lib/lsb/init-functions
+
+if [ -e "/etc/default/traffic" ] ; then
+   . /etc/default/traffic
+fi
+
+if [ ! -z "$BRAIN" ] ; then
+    if [ "$BRAIN" = "mdns" ] ; then
+        BRAIN="`avahi-resolve -n -4 traffic-brain.local | cut -f 2`"
+        if [ -z "$BRAIN" ] ; then
+            echo "unable to find brain"
+            exit 1
+        fi
+    fi
+    ARGS="${ARGS} -b ${BRAIN}"
+fi
+
+if [ ! -z "$CONTROLS" ] && [ "$CONTROLS" = "yes" ] ; then
+    ARGS="${ARGS} -c"
+fi
 
 case "$1" in 
     start)
         echo "Starting traffic"
-        start-stop-daemon --start --background --oknodo --pidfile $PIDFILE -m --exec $DAEMON -- $ARGS
+        start-stop-daemon --background --oknodo --pidfile $PIDFILE -m --exec $DAEMON --start -- $ARGS
         ;;
     stop)
         echo "Stopping traffic"

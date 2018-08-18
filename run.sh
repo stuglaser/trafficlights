@@ -4,7 +4,7 @@ LOGFILE=/var/log/traffic.log
  
 # Fork off node into the background and log to a file
 echo "Forking at `date`" >> ${LOGFILE}
-python ${TRAFFIC} $@ >>${LOGFILE} 2>&1 </dev/null &
+python -u ${TRAFFIC} $@ >> ${LOGFILE} 2>&1 </dev/null &
  
 # Capture the child process PID
 CHILD="$!"

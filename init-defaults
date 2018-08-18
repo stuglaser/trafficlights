@@ -1,0 +1,4 @@
+# configuration for traffic lights
+
+BRAIN="%(brain)s"
+CONTROLS="%(controls)s"

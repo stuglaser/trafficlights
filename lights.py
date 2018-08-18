@@ -36,7 +36,7 @@ def setup_controls():
     if 'RPi.GPIO' not in sys.modules:
         raise Exception('Cannot use HW on non RPi')
 
-    if not GPIO.getmode():
+    if not GPIO.getmode() or GPIO.getmode() != GPIO.BOARD:
         GPIO.setmode(GPIO.BOARD)
 
     GPIO.setup(COLOR_BTN, GPIO.IN)
@@ -53,7 +53,7 @@ def setup():
 
 
 def cleanup():
-    if not IS_FAKE:
+    if 'RPi.GPIO' in sys.modules:
         GPIO.cleanup()
 
 

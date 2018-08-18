@@ -331,10 +331,13 @@ def main():
 
     with lights.setup_manager(args):
         if args.brain is None:
-            print 'I am the brain'
+            msg = 'I am the brain'
+            if args.controls:
+                msg = "%s with hw controls" % msg
+            print(msg)
             brain_loop(args)
         else:
-            print 'Listening to:', args.brain
+            print('Listening to:', args.brain)
             node_loop(args.brain)
 
 
