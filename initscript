@@ -24,11 +24,19 @@ fi
 
 if [ ! -z "$BRAIN" ] ; then
     if [ "$BRAIN" = "mdns" ] ; then
-        BRAIN="`avahi-resolve -n -4 traffic-brain.local | cut -f 2`"
-        if [ -z "$BRAIN" ] ; then
-            echo "unable to find brain"
-            exit 1
-        fi
+        RETRIES=12
+        while [ -z "$BRAIN" ] || [ "$BRAIN" = "mdns" ] ; do
+            BRAIN="`avahi-resolve -n -4 traffic-brain.local 2> /dev/null | cut -f 2`"
+            if [ -z "$BRAIN" ] ; then
+                if [ "$RETRIES" = 0 ] ; then
+                    echo "giving up"
+                    exit 1
+                fi
+                echo "unable to find brain, pausing"
+                sleep 5
+                RETRIES=$(expr $RETRIES - 1)
+            fi
+        done
     fi
     ARGS="${ARGS} -b ${BRAIN}"
 fi
