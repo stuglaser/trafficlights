@@ -51,3 +51,6 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Local Dev Env
+devenv/

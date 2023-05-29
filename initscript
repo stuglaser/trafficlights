@@ -1,0 +1,66 @@
+#!/bin/sh
+
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          traffic
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Trafficlights
+# Description:       Traffic lights
+### END INIT INFO
+
+DAEMON="/bin/bash /home/pi/run.sh"
+PIDFILE="/var/run/traffic.pid"
+ARGS=""
+
+. /lib/lsb/init-functions
+
+if [ -e "/etc/default/traffic" ] ; then
+   . /etc/default/traffic
+fi
+
+if [ ! -z "$BRAIN" ] ; then
+    if [ "$BRAIN" = "mdns" ] ; then
+        RETRIES=12
+        while [ -z "$BRAIN" ] || [ "$BRAIN" = "mdns" ] ; do
+            BRAIN="`avahi-resolve -n -4 traffic-brain.local 2> /dev/null | cut -f 2`"
+            if [ -z "$BRAIN" ] ; then
+                if [ "$RETRIES" = 0 ] ; then
+                    echo "giving up"
+                    exit 1
+                fi
+                echo "unable to find brain, pausing"
+                sleep 5
+                RETRIES=$(expr $RETRIES - 1)
+            fi
+        done
+    fi
+    ARGS="${ARGS} -b ${BRAIN}"
+fi
+
+if [ ! -z "$CONTROLS" ] && [ "$CONTROLS" = "yes" ] ; then
+    ARGS="${ARGS} -c"
+fi
+
+case "$1" in 
+    start)
+        echo "Starting traffic"
+        start-stop-daemon --background --oknodo --pidfile $PIDFILE -m --exec $DAEMON --start -- $ARGS
+        ;;
+    stop)
+        echo "Stopping traffic"
+        start-stop-daemon --stop --oknodo --pidfile $PIDFILE
+        ;;
+    status)
+        status_of_proc -p $PIDFILE $DAEMON
+        ;;
+    *)
+        echo "Usage: /etc/init.d/traffic start|stop|status"
+        exit 1
+        ;;
+esac
+
+exit 0
